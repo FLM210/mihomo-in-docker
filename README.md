@@ -23,6 +23,7 @@ This project aims to containerize Mihomo (a high-performance fork of Clash) usin
 
 - **Architecture Adaptation**: Automatically identifies system architecture (amd64/arm64) during build and downloads corresponding Mihomo binary
 - **Automatic Configuration Generation**: Utilizes Go program to parse environment variables or templates to generate config.yaml
+- **Intelligent Node Filtering**: Automatically filters proxy nodes based on keywords, supporting automatic failover groups for specific regions
 - **Lightweight Operation**: Built on Alpine Linux for final image, containing only necessary components
 - **Multi-stage Build**: Separates build, download, and runtime stages to reduce image size
 - No root permission dependency, suitable for security-enhanced scenarios
@@ -58,7 +59,7 @@ docker run -p 9090:9090 -p 10801:10801 \
 ### Environment Variables
 
 - `SUBSCRIPTION_URL`: Subscription URL for proxy nodes
-- `FILTER_KEYWORDS`: Keywords to filter proxy nodes (comma separated)
+- `FILTER_KEYWORDS`: Keywords to filter proxy nodes (comma separated). The program automatically creates failover groups based on these keywords.
 - `OUTPUT_FILE`: Output filename (default: config.yaml)
 - `OUTPUT_FORMAT`: Output format (yaml or json, default: yaml)
 
@@ -66,9 +67,31 @@ docker run -p 9090:9090 -p 10801:10801 \
 
 The configuration generator supports:
 - Subscription URL processing
-- Keyword filtering for nodes
+- Keyword filtering for nodes with automatic failover group creation
 - YAML/JSON output formats
 - Support for various proxy protocols (VMess, VLESS, Trojan, Shadowsocks, etc.)
+- Automatic generation of proxy groups with auto-failover capabilities based on filter keywords
+
+## Advanced Usage: Automatic Node Switching
+
+The program automatically creates a proxy group with automatic failover capabilities based on the keywords provided in the `FILTER_KEYWORDS` environment variable. For example:
+
+- If you set `FILTER_KEYWORDS=HK`, the program will filter all nodes containing "HK" (Hong Kong) in their names and create an automatic failover group.
+- If you set `FILTER_KEYWORDS=HK,SG,JP`, it will create a single group containing all nodes that match any of these keywords (Hong Kong, Singapore, Japan), with automatic failover between them.
+
+### Kubernetes Example: Region-Specific Deployment
+
+If you want to deploy a pod in K8S specifically for HK (Hong Kong) nodes, simply set the filter to include the corresponding node names for Hong Kong in your provider's subscription:
+
+```yaml
+env:
+- name: SUBSCRIPTION_URL
+  value: "https://your-provider.com/subscription"
+- name: FILTER_KEYWORDS
+  value: "Hong Kong,HK,hk"  # Keywords that match your provider's Hong Kong nodes
+```
+
+This will automatically filter and create failover groups containing only Hong Kong nodes, with automatic switching between them based on connectivity.
 
 ## Ports
 
@@ -93,7 +116,7 @@ This project provides a complete Kubernetes deployment configuration in the [k8s
 
 1. **Update the configuration** in [k8s-deployment.yaml](k8s-deployment.yaml):
    - Replace `https://example.com/subscription` with your actual subscription URL
-   - Adjust the `FILTER_KEYWORDS` as needed
+   - Adjust the `FILTER_KEYWORDS` as needed to specify region-based filters (e.g., "HK" for Hong Kong nodes)
    - Update the hostnames in the Ingress section (e.g., `mihomo.example.com`, `proxy.example.com`)
 
 2. **Deploy the resources**:

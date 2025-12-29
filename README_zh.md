@@ -23,6 +23,7 @@
 
 - **架构自适应**: 在构建时自动识别系统架构（amd64/arm64），下载对应的 Mihomo 二进制
 - **配置自动生成**: 利用 Go 程序解析环境变量或模板生成 config.yaml
+- **智能节点过滤**: 自动根据关键词过滤代理节点，支持为特定地区创建自动故障转移组
 - **轻量运行**: 基于 Alpine Linux 构建最终镜像，仅包含必要组件
 - **多阶段构建**: 分离构建、下载和运行阶段，减小镜像体积
 - 无 root 权限依赖，适合安全强化场景
@@ -58,7 +59,7 @@ docker run -p 9090:9090 -p 10801:10801 \
 ### 环境变量
 
 - `SUBSCRIPTION_URL`: 代理节点的订阅 URL
-- `FILTER_KEYWORDS`: 用于过滤节点的关键字（以逗号分隔）
+- `FILTER_KEYWORDS`: 用于过滤节点的关键字（以逗号分隔）。程序会根据这些关键字自动创建故障转移组。
 - `OUTPUT_FILE`: 输出文件名（默认: config.yaml）
 - `OUTPUT_FORMAT`: 输出格式（yaml 或 json，默认: yaml）
 
@@ -66,9 +67,29 @@ docker run -p 9090:9090 -p 10801:10801 \
 
 配置生成器支持：
 - 订阅 URL 处理
-- 节点关键字过滤
+- 节点关键字过滤（自动创建故障转移组）
 - YAML/JSON 输出格式
 - 支持多种代理协议（VMess、VLESS、Trojan、Shadowsocks 等）
+- 根据过滤关键字自动生成带自动故障转移功能的代理组
+
+## 高级用法：自动节点切换
+
+- 如果设置 `FILTER_KEYWORDS=HK`，程序将筛选出名称中包含"HK"（香港）的所有节点并创建一个自动故障转移组。
+- 如果设置 `FILTER_KEYWORDS=HK,SG,JP`，它将创建一个包含所有匹配这些关键词的节点的单一组（香港、新加坡、日本），并在它们之间自动故障转移。
+
+### Kubernetes 示例：特定地区部署
+
+如果你想在 K8S 上启动一个专门用于 HK（香港）节点的 Pod，只需将过滤器设置为包含机场中香港对应节点名称的关键词：
+
+```yaml
+env:
+- name: SUBSCRIPTION_URL
+  value: "https://your-provider.com/subscription"
+- name: FILTER_KEYWORDS
+  value: "香港,HK,hk"  # 与你的提供商香港节点匹配的关键词
+```
+
+这将自动过滤并创建仅包含香港节点的故障转移组，并根据连接情况在它们之间自动切换。
 
 ## 端口
 
@@ -93,7 +114,7 @@ docker run -p 9090:9090 -p 10801:10801 \
 
 1. **在 [k8s-deployment.yaml](k8s-deployment.yaml) 中更新配置**：
    - 将 `https://example.com/subscription` 替换为您的实际订阅 URL
-   - 根据需要调整 [FILTER_KEYWORDS](file:///Users/admin/code/mihomo-in-docker/utils/config_generator.go#L24-L121)
+   - 根据需要调整 [FILTER_KEYWORDS]指定基于地区的过滤器（例如 "HK" 表示香港节点）
    - 更新 Ingress 部分中的主机名（例如 `mihomo.example.com`、`proxy.example.com`）
 
 2. **部署资源**：
