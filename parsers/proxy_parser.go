@@ -599,7 +599,7 @@ func parseShadowsocksR(ssrURL string) (map[string]interface{}, error) {
 				remarksStr += "="
 			}
 		}
-		
+
 		decodedRemarks, err := base64.StdEncoding.DecodeString(remarksStr)
 		if err != nil {
 			// If standard base64 decoding fails, try URL-safe base64 decoding
@@ -613,7 +613,7 @@ func parseShadowsocksR(ssrURL string) (map[string]interface{}, error) {
 		} else {
 			remarks = string(decodedRemarks)
 		}
-		
+
 		// After base64 decoding, check if the result contains URL-encoded characters
 		if strings.Contains(remarks, "%") {
 			decodedRemarks, err := url.QueryUnescape(remarks)
@@ -766,6 +766,16 @@ func ConvertToMihomo(subContent string, filterKeywords ...string) (*map[string]i
 		"external-controller-cors": map[string]interface{}{
 			"allow-origins":         []string{"*"},
 			"allow-private-network": true,
+		},
+		"dns": map[string]interface{}{
+			"enable": true,
+			"ipv6":   false,
+			// "enhanced-mode": "fake-ip",
+			"nameserver": []string{
+				"https://223.5.5.5/dns-query",
+				"https://1.1.1.1/dns-query",
+				"https://dns.google/dns-query",
+			},
 		},
 		"rules": []interface{}{
 			"MATCH,AUTO", // 直接使用 AUTO 组，而不是 PROXY 组
