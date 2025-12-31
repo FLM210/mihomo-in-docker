@@ -588,7 +588,7 @@ func parseShadowsocksR(ssrURL string) (map[string]interface{}, error) {
 		remarks := params["remarks"]
 
 		// The remarks in SSR are typically base64 encoded
-		// Try to base64 decode the remarks
+		// Try to base64 decode the remarks first
 		// Add padding if needed
 		remarksStr := remarks
 		if !strings.HasSuffix(remarksStr, "=") && !strings.Contains(remarksStr, "=") {
@@ -599,10 +599,27 @@ func parseShadowsocksR(ssrURL string) (map[string]interface{}, error) {
 				remarksStr += "="
 			}
 		}
-
+		
 		decodedRemarks, err := base64.StdEncoding.DecodeString(remarksStr)
-		if err == nil {
+		if err != nil {
+			// If standard base64 decoding fails, try URL-safe base64 decoding
+			decodedRemarks, err = base64.URLEncoding.DecodeString(remarksStr)
+			if err == nil {
+				remarks = string(decodedRemarks)
+			} else {
+				// If both fail, use the original string
+				remarks = params["remarks"]
+			}
+		} else {
 			remarks = string(decodedRemarks)
+		}
+		
+		// After base64 decoding, check if the result contains URL-encoded characters
+		if strings.Contains(remarks, "%") {
+			decodedRemarks, err := url.QueryUnescape(remarks)
+			if err == nil {
+				remarks = decodedRemarks
+			}
 		}
 
 		// Remove emoji characters from the remarks
