@@ -488,17 +488,38 @@ func parseShadowsocksR(ssrURL string) (map[string]interface{}, error) {
 	// Remove the ssr:// prefix
 	urlStr := strings.TrimPrefix(ssrURL, "ssr://")
 
-	// Decode the base64 encoded part
-	decoded, err := base64.URLEncoding.DecodeString(strings.TrimRight(urlStr, "="))
+	// First, try standard base64 with padding handling
+	// Add padding if missing
+	originalUrlStr := urlStr
+	if !strings.HasSuffix(urlStr, "=") && !strings.Contains(urlStr, "=") {
+		switch len(urlStr) % 4 {
+		case 2:
+			urlStr += "=="
+		case 3:
+			urlStr += "="
+		}
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(urlStr)
 	if err != nil {
-		// Try standard base64 if URL encoding fails
-		decoded, err = base64.StdEncoding.DecodeString(strings.TrimRight(urlStr, "="))
+		// Try URL-safe base64 decoding
+		urlStr = originalUrlStr
+		if !strings.HasSuffix(urlStr, "=") && !strings.Contains(urlStr, "=") {
+			switch len(urlStr) % 4 {
+			case 2:
+				urlStr += "=="
+			case 3:
+				urlStr += "="
+			}
+		}
+		decoded, err = base64.URLEncoding.DecodeString(urlStr)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	parts := strings.Split(string(decoded), ":")
+	// 使用SplitN分割成6部分，确保正确处理password中的冒号
+	parts := strings.SplitN(string(decoded), ":", 6)
 	if len(parts) < 6 {
 		return nil, fmt.Errorf("invalid ssr format")
 	}
@@ -508,18 +529,37 @@ func parseShadowsocksR(ssrURL string) (map[string]interface{}, error) {
 	protocol := parts[2]
 	method := parts[3]
 	obfs := parts[4]
-	base64Pass := parts[5]
+	passwordPart := parts[5]
 
-	// Extract additional parameters from query string if present
+	// 提取查询参数 - 注意格式是 base64(password)/?params
 	var additionalParams string
-	if idx := strings.Index(base64Pass, "/?"); idx != -1 {
-		additionalParams = base64Pass[idx+2:]
-		base64Pass = base64Pass[:idx]
+	var actualPassword string
+
+	// 查找密码部分中的/?来分离密码和参数
+	if idx := strings.Index(passwordPart, "/?"); idx != -1 {
+		actualPassword = passwordPart[:idx]
+		additionalParams = passwordPart[idx+2:]
+	} else {
+		actualPassword = passwordPart
 	}
 
-	password, err := base64.URLEncoding.DecodeString(strings.TrimRight(base64Pass, "="))
+	// Decode the password part (which is base64 encoded)
+	var password []byte
+	// Add padding to password part if needed
+	passwordStr := actualPassword
+	if !strings.HasSuffix(passwordStr, "=") && !strings.Contains(passwordStr, "=") {
+		switch len(passwordStr) % 4 {
+		case 2:
+			passwordStr += "=="
+		case 3:
+			passwordStr += "="
+		}
+	}
+
+	password, err = base64.StdEncoding.DecodeString(passwordStr)
 	if err != nil {
-		password, err = base64.StdEncoding.DecodeString(strings.TrimRight(base64Pass, "="))
+		// Try URL-safe decoding for password
+		password, err = base64.URLEncoding.DecodeString(passwordStr)
 		if err != nil {
 			return nil, err
 		}
@@ -539,6 +579,7 @@ func parseShadowsocksR(ssrURL string) (map[string]interface{}, error) {
 		"password": string(password),
 		"protocol": protocol,
 		"obfs":     obfs,
+		"udp":      true,
 	}
 
 	// Parse additional parameters
@@ -546,16 +587,22 @@ func parseShadowsocksR(ssrURL string) (map[string]interface{}, error) {
 	if params["remarks"] != "" {
 		remarks := params["remarks"]
 
-		// Check if the remarks contain URL encoded characters
-		if strings.Contains(remarks, "%") {
-			// URL decode the remarks
-			decodedRemarks, err := url.QueryUnescape(remarks)
-			if err != nil {
-				// Fallback to manual replacements if QueryUnescape fails
-				decodedRemarks = strings.ReplaceAll(remarks, "%20", " ")
-				decodedRemarks = strings.ReplaceAll(decodedRemarks, "%F0%9F%87%B9%F0%9F%87%BC", "🇹🇼") // Taiwan flag emoji
+		// The remarks in SSR are typically base64 encoded
+		// Try to base64 decode the remarks
+		// Add padding if needed
+		remarksStr := remarks
+		if !strings.HasSuffix(remarksStr, "=") && !strings.Contains(remarksStr, "=") {
+			switch len(remarksStr) % 4 {
+			case 2:
+				remarksStr += "=="
+			case 3:
+				remarksStr += "="
 			}
-			remarks = decodedRemarks
+		}
+
+		decodedRemarks, err := base64.StdEncoding.DecodeString(remarksStr)
+		if err == nil {
+			remarks = string(decodedRemarks)
 		}
 
 		// Remove emoji characters from the remarks
@@ -564,24 +611,32 @@ func parseShadowsocksR(ssrURL string) (map[string]interface{}, error) {
 		proxy["name"] = remarks
 	}
 	if params["obfsparam"] != "" {
-		obfsParam, err := base64.URLEncoding.DecodeString(strings.TrimRight(params["obfsparam"], "="))
-		if err != nil {
-			obfsParam, err = base64.StdEncoding.DecodeString(strings.TrimRight(params["obfsparam"], "="))
-			if err == nil {
-				proxy["obfs-param"] = string(obfsParam)
+		obfsParamStr := params["obfsparam"]
+		if !strings.HasSuffix(obfsParamStr, "=") && !strings.Contains(obfsParamStr, "=") {
+			switch len(obfsParamStr) % 4 {
+			case 2:
+				obfsParamStr += "=="
+			case 3:
+				obfsParamStr += "="
 			}
-		} else {
+		}
+		obfsParam, err := base64.StdEncoding.DecodeString(obfsParamStr)
+		if err == nil {
 			proxy["obfs-param"] = string(obfsParam)
 		}
 	}
 	if params["protoparam"] != "" {
-		protoParam, err := base64.URLEncoding.DecodeString(strings.TrimRight(params["protoparam"], "="))
-		if err != nil {
-			protoParam, err = base64.StdEncoding.DecodeString(strings.TrimRight(params["protoparam"], "="))
-			if err == nil {
-				proxy["protocol-param"] = string(protoParam)
+		protoParamStr := params["protoparam"]
+		if !strings.HasSuffix(protoParamStr, "=") && !strings.Contains(protoParamStr, "=") {
+			switch len(protoParamStr) % 4 {
+			case 2:
+				protoParamStr += "=="
+			case 3:
+				protoParamStr += "="
 			}
-		} else {
+		}
+		protoParam, err := base64.StdEncoding.DecodeString(protoParamStr)
+		if err == nil {
 			proxy["protocol-param"] = string(protoParam)
 		}
 	}
