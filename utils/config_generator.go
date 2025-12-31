@@ -60,6 +60,11 @@ func GenerateConfigFromEnv() error {
 		config, err = parsers.ConvertToMihomo(subContent)
 	}
 	if err != nil {
+		// 检查错误是否是由于过滤器没有匹配任何节点
+		if strings.Contains(err.Error(), "no proxies matched the filter keywords") {
+			fmt.Printf("提示: 没有找到匹配过滤条件的节点: %v\n", filters)
+			os.Exit(254)
+		}
 		return fmt.Errorf("转换为 mihomo 配置失败: %v", err)
 	}
 

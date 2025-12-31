@@ -730,6 +730,11 @@ func ConvertToMihomo(subContent string, filterKeywords ...string) (*map[string]i
 		}
 	}
 
+	// Check if filtering was applied but no proxies matched the filter
+	if len(filterKeywords) > 0 && len(proxies) == 0 {
+		return nil, fmt.Errorf("no proxies matched the filter keywords: %v", filterKeywords)
+	}
+
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
