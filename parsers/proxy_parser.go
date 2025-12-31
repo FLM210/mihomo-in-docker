@@ -770,6 +770,9 @@ func ConvertToMihomo(subContent string, filterKeywords ...string) (*map[string]i
 		"dns": map[string]interface{}{
 			"enable": true,
 			"ipv6":   false,
+			"proxy-server-nameserver": []string{
+				"https://223.5.5.5/dns-query",
+			},
 			// "enhanced-mode": "fake-ip",
 			"nameserver": []string{
 				"https://223.5.5.5/dns-query",

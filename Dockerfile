@@ -36,9 +36,8 @@ RUN ARCH=$(uname -m) && \
 
 # 最终运行阶段 - 从 Alpine 开始，只包含必要的二进制文件
 FROM alpine:latest
-
 # 安装 ca-certificates 以支持 HTTPS 请求
-RUN apk --no-cache add ca-certificates bash
+RUN apk --no-cache add ca-certificates bash curl
 
 # 设置工作目录
 WORKDIR /app
