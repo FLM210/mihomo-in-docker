@@ -771,12 +771,12 @@ func ConvertToMihomo(subContent string, filterKeywords ...string) (*map[string]i
 			"enable": true,
 			"ipv6":   false,
 			"proxy-server-nameserver": []string{
-				"https://1.12.12.12/dns-query",
+				"https://1.1.1.1/dns-query",
 				"https://120.53.53.53/dns-query",
 			},
 			// "enhanced-mode": "fake-ip",
 			"nameserver": []string{
-				"https://1.12.12.12/dns-query",
+				"https://1.1.1.1/dns-query",
 				"https://120.53.53.53/dns-query",
 			},
 		},
